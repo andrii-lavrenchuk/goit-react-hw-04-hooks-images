@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import PropTypes from 'prop-types';
 
 import { createPortal } from 'react-dom';
@@ -7,26 +7,16 @@ import s from './Modal.module.css';
 const modalRoot = document.querySelector('#modal-root');
 
 export default function Modal({ onClose, largeImageURL, tags }) {
-  const isFirstRender = useRef(true);
-
   useEffect(() => {
-    if (isFirstRender.current) {
-      window.addEventListener('keydown', handleEscKeydown);
-      console.log(isFirstRender);
-      isFirstRender.current = false;
-      return;
-    }
+    window.addEventListener('keydown', handleEscKeydown);
 
     return () => {
-      console.log('Забираєм слухача з модалки');
-
       window.removeEventListener('keydown', handleEscKeydown);
     };
   });
 
   const handleEscKeydown = e => {
     if (e.code === 'Escape') {
-      console.log('jlkj');
       onClose();
     }
   };
