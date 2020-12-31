@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useState, useEffect } from 'react';
 
 import LoaderComponent from '../Loader/Loader';
 import ImageGalleryItem from '../ImageGalleryItem/ImageGalleryItem';
@@ -9,49 +9,52 @@ import imagesAPI from '../../services/images-api';
 import Title from '../Title/Title';
 import s from './ImageGallery.module.css';
 
-export default class ImageGallery extends Component {
-  state = {
-    images: [],
-    currentPage: 1,
-    searchQuery: '',
-    error: null,
-    status: 'idle',
-  };
+const Status = {
+  IDLE: 'idle',
+  PENDING: 'pending',
+  RESOLVED: 'resolved',
+  REJECTED: 'rejected',
+};
 
-  componentDidUpdate(prevProps, prevState) {
-    if (prevState.searchQuery !== this.state.searchQuery) {
-      this.setState({ status: 'pending' });
-      this.fetchImages();
+export default function ImageGallery() {
+  const [images, setImages] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [error, setError] = useState(null);
+  const [status, setStatus] = useState(Status.IDLE);
+
+  useEffect(() => {
+    console.log('Перший рендер');
+    if (!searchQuery) {
+      return;
     }
-  }
-
-  onChangeQuery = query => {
-    this.setState({
-      searchQuery: query,
-      currentPage: 1,
-      images: [],
-      error: null,
-    });
-  };
-
-  fetchImages = () => {
-    const { currentPage, searchQuery } = this.state;
-
-    const options = { searchQuery, currentPage };
-
-    this.setState({ isLoading: true });
+    setStatus(Status.PENDING);
 
     imagesAPI
-      .fetchImages(options)
-      .then(images =>
-        this.setState(prevState => ({
-          images: [...prevState.images, ...images.hits],
-          currentPage: prevState.currentPage + 1,
-          status: 'resolved',
-        })),
-      )
-      .catch(error => this.setState({ error, status: 'rejected' }));
+      .fetchImages({ searchQuery, currentPage })
+      .then(images => {
+        setImages(prevImages => [...prevImages, ...images.hits]);
+        setStatus(Status.RESOLVED);
+      })
+      .catch(error => {
+        setError(error);
+        setStatus(Status.REJECTED);
+      });
+  }, [searchQuery, currentPage]);
 
+  const onChangeQuery = query => {
+    setSearchQuery(query);
+    setCurrentPage(1);
+    setImages([]);
+    setError(null);
+  };
+
+  const onLoadMore = () => {
+    setCurrentPage(currentPage + 1);
+    scrollPage();
+  };
+
+  const scrollPage = () => {
     setTimeout(() => {
       window.scrollBy({
         top: document.documentElement.scrollHeight,
@@ -60,55 +63,51 @@ export default class ImageGallery extends Component {
     }, 1000);
   };
 
-  render() {
-    const { images, searchQuery, status } = this.state;
+  if (status === Status.IDLE) {
+    return (
+      <>
+        <Searchbar onSubmit={onChangeQuery} />
+        <Title title="Find the best pictures you've ever seen" />
+      </>
+    );
+  }
 
-    if (status === 'idle') {
-      return (
-        <>
-          <Searchbar onSubmit={this.onChangeQuery} />
-          <Title title="Find the best pictures you've ever seen" />
-        </>
-      );
-    }
+  if (status === Status.PENDING) {
+    return (
+      <>
+        <Searchbar onSubmit={onChangeQuery} />
+        <LoaderComponent />
+      </>
+    );
+  }
 
-    if (status === 'pending') {
-      return (
-        <>
-          <Searchbar onSubmit={this.onChangeQuery} />
-          <LoaderComponent />
-        </>
-      );
-    }
+  if (status === Status.REJECTED || images.length === 0) {
+    return (
+      <>
+        <Searchbar onSubmit={onChangeQuery} />
+        <ErrorView
+          message={`Cannot find any results of ${searchQuery}, please, change the search text `}
+        />
+      </>
+    );
+  }
 
-    if (status === 'rejected' || images.length === 0) {
-      return (
-        <>
-          <Searchbar onSubmit={this.onChangeQuery} />
-          <ErrorView
-            message={`Cannot find any results of ${searchQuery}, please, change the search text `}
-          />
-        </>
-      );
-    }
-
-    if (status === 'resolved') {
-      return (
-        <>
-          <Searchbar onSubmit={this.onChangeQuery} />
-          <ul className={s.imageGallery}>
-            {images.map(({ id, webformatURL, tags, largeImageURL }) => (
-              <ImageGalleryItem
-                key={id}
-                webformatURL={webformatURL}
-                tags={tags}
-                largeImageURL={largeImageURL}
-              />
-            ))}
-          </ul>
-          {images.length > 0 && <Button onLoadMore={this.fetchImages} />}
-        </>
-      );
-    }
+  if (status === Status.RESOLVED) {
+    return (
+      <>
+        <Searchbar onSubmit={onChangeQuery} />
+        <ul className={s.imageGallery}>
+          {images.map(({ id, webformatURL, tags, largeImageURL }) => (
+            <ImageGalleryItem
+              key={id}
+              webformatURL={webformatURL}
+              tags={tags}
+              largeImageURL={largeImageURL}
+            />
+          ))}
+        </ul>
+        {images.length > 0 && <Button onLoadMore={onLoadMore} />}
+      </>
+    );
   }
 }
