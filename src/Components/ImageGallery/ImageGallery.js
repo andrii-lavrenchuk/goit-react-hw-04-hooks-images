@@ -24,7 +24,6 @@ export default function ImageGallery() {
   const [status, setStatus] = useState(Status.IDLE);
 
   useEffect(() => {
-    console.log('Перший рендер');
     if (!searchQuery) {
       return;
     }
